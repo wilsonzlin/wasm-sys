@@ -38,7 +38,7 @@ const SPECIFIER_PARSERS: {
   { length: new Set(), type: new Set("%"), parse: () => "%" },
 ];
 
-const SPECIFIER_FORMATTERS = {
+const SPECIFIER_FORMATTERS: any = {
   "%": () => "%",
   d: (val: number | bigint) => val.toString(),
   i: (val: number | bigint) => val.toString(),
@@ -69,18 +69,17 @@ const SPECIFIER_FORMATTERS = {
   A: (val: number) => val.toString(16).toUpperCase(),
 };
 
-const formatFromVarargs = (mem: MemoryWalker): string =>
+export const formatFromVarargs = (mem: MemoryWalker): string =>
   mem
     .readAndDereferencePointer()
     .readNullTerminatedString()
     .replace(
-      /%([-+ 0'#]*)((?:[0-9]+|\*)?)((?:\.(?:[0-9]+|\*))?)((?:hh|h|l|ll|L|z|j|t|I|I32|I64|q)?)([%diufFeEgGxXoscpaA])/g,
-      (spec, flags, width, precision, length, type) => {
+      /%([-+ 0'#]*)([0-9]+|\*)?(\.[0-9]+|\.\*)?(hh|h|l|ll|L|z|j|t|I|I32|I64|q)?([%diufFeEgGxXoscpaA])/g,
+      (spec, flags, width, precision, length = "", type) => {
         // These aren't used in our C code right now but we can implement later on if we do.
         if (flags || width || precision) {
           throw new Error(`Unsupported format specifier "${spec}"`);
         }
-        console.log({ spec, flags, width, precision, length, type });
 
         const parser = SPECIFIER_PARSERS.find(
           (p) => p.length.has(length) && p.type.has(type)
