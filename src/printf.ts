@@ -94,6 +94,7 @@ export const formatFromVarargs = (
             })}`
           );
         }
+        // TODO Values are aligned.
         const rawValue = parser.parse(varargBufStart);
 
         return SPECIFIER_FORMATTERS[type](rawValue);
