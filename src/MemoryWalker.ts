@@ -27,7 +27,13 @@ export class MemoryWalker {
     return new MemoryWalker(this.buffer, this.readUInt32LE());
   }
 
-  readSlice(len: number): ArrayBuffer {
+  readSliceView(len: number): Uint8Array {
+    const start = this.next;
+    this.next += len;
+    return new Uint8Array(this.buffer, start, len);
+  }
+
+  readSliceCopy(len: number): ArrayBuffer {
     return this.buffer.slice(this.next, (this.next += len));
   }
 
