@@ -31,11 +31,11 @@ const SPECIFIER_PARSERS: {
     parse: (mem) => mem.readDoubleLE(),
   },
   {
-    length: new Set(),
+    length: new Set([""]),
     type: new Set("s"),
     parse: (mem) => mem.readAndDereferencePointer().readNullTerminatedString(),
   },
-  { length: new Set(), type: new Set("%"), parse: () => "%" },
+  { length: new Set([""]), type: new Set("%"), parse: () => "%" },
 ];
 
 const SPECIFIER_FORMATTERS: any = {
@@ -69,9 +69,11 @@ const SPECIFIER_FORMATTERS: any = {
   A: (val: number) => val.toString(16).toUpperCase(),
 };
 
-export const formatFromVarargs = (mem: MemoryWalker): string =>
-  mem
-    .readAndDereferencePointer()
+export const formatFromVarargs = (
+  fmt: MemoryWalker,
+  varargBufStart: MemoryWalker
+): string =>
+  fmt
     .readNullTerminatedString()
     .replace(
       /%([-+ 0'#]*)([0-9]+|\*)?(\.[0-9]+|\.\*)?(hh|h|l|ll|L|z|j|t|I|I32|I64|q)?([%diufFeEgGxXoscpaA])/g,
@@ -85,9 +87,14 @@ export const formatFromVarargs = (mem: MemoryWalker): string =>
           (p) => p.length.has(length) && p.type.has(type)
         );
         if (!parser) {
-          throw new SyntaxError(`Invalid format specifier "${spec}"`);
+          throw new SyntaxError(
+            `Invalid format specifier "${spec}" with ${JSON.stringify({
+              length,
+              type,
+            })}`
+          );
         }
-        const rawValue = parser.parse(mem);
+        const rawValue = parser.parse(varargBufStart);
 
         return SPECIFIER_FORMATTERS[type](rawValue);
       }

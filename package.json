@@ -11,8 +11,8 @@
   "scripts": {
     "build": "npm run clean && tsc",
     "clean": "rm -rf dist",
-    "format": "prettier --write 'src/**/*.ts'",
-    "prepublishOnly": "prettier --check 'src/**/*.ts' && npm run build && npm run test",
+    "format": "prettier --write 'src/**/*.ts' '*.js'",
+    "prepublishOnly": "prettier --check 'src/**/*.ts' '*.js' && npm run build && npm run test",
     "test": "jest"
   },
   "devDependencies": {

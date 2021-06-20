@@ -21,7 +21,7 @@ export const compile = async <Exports extends WebAssembly.Exports>(
   await writeFile(tmpSrc, code);
   await new Promise<void>((resolve, reject) => {
     const proc = spawn(
-      "clang",
+      process.env.CC || "clang",
       [
         "-std=c17",
         "-O0",
