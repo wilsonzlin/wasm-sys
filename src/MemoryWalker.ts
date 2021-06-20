@@ -1,4 +1,4 @@
-import { utf8Decoder } from "./utf8";
+import decodeUtf8 from "extlib/js/decodeUtf8";
 
 export class MemoryWalker {
   private readonly dataView: DataView;
@@ -86,7 +86,7 @@ export class MemoryWalker {
     while (this.uint8Array[end]) {
       end++;
     }
-    const val = utf8Decoder.decode(this.uint8Array.slice(this.next, end));
+    const val = decodeUtf8(this.uint8Array.slice(this.next, end));
     this.next = end + 1;
     return val;
   }

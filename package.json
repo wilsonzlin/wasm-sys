@@ -16,6 +16,9 @@
     "prepublishOnly": "prettier --check 'src/**/*.ts' '*.js' && npm run build && npm run test",
     "test": "jest"
   },
+  "dependencies": {
+    "extlib": "^0.15.3"
+  },
   "devDependencies": {
     "@types/jest": "^26.0.23",
     "@types/node": "^15.12.4",
