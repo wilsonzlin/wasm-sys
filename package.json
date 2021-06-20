@@ -2,6 +2,7 @@
   "name": "wasm-sys",
   "description": "Interact with WebAssembly at a low level",
   "version": "0.0.2",
+  "main": "dist/_main.js",
   "files": [
     "dist/**"
   ],
