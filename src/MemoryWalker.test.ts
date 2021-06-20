@@ -1,5 +1,12 @@
 import { byteHex, compile } from "./_common.test";
 
+/*
+NOTES:
+  - Throughout this file, references to direction w.r.t. memory mean:
+    - towards higher addresses when mentioning "up", "upward", "big", "bigger", etc.
+    - towards lower addresses when mentioning "down", "downward", "small", "smaller", etc.
+*/
+
 test("WASM grows stack upwards, starting from __heap_base; within each frame, the layout is [last var, first arg] as [smallest addr, biggest addr]", async () => {
   let lastPtr = Infinity;
   const { exports } = await compile<{
@@ -68,12 +75,11 @@ test("WASM stores static data starting from addr 1024", async () => {
   exports.main();
 });
 
-test("WASM args and varargs layout", async () => {
+test("WASM args layout", async () => {
   /*
      SUMMARY:
      - Lowest address: first stack variable.
      - Next:           non-variadic arguments, aligned with padding, pushed upwards from last to first.
-     - Next:           variadic arguments, promoted to long, aligned with padding, pushed downwards from first to last.
      Definition of push: set value to next address **in push direction** where address is multiple of value size.
        - Order of values pushed and the push direction are significant, as they determine which bytes are skipped as padding.
    */
@@ -81,61 +87,28 @@ test("WASM args and varargs layout", async () => {
     main(): number;
   }>(
     `
-    void on_vararg(void* ptr);
     void on_frame(void* ptr);
-    void varfn(char a1, short a2, char a3, char a4, long a5, long long a6, ...) {
+    void varfn(char a1, short a2, char a3, char a4, long a5, long long a6) {
       int stackVar1 = 0xCAFEB0BA;
+      (void) a1;
       (void) a2;
       (void) a3;
       (void) a4;
       (void) a5;
       (void) a6;
-      (void) stackVar1;
-      on_vararg((void*) (&a1 + sizeof(a1)));
       on_frame((void*) &stackVar1);
     }
     __attribute__((visibility("default"))) int main(void) {
-      int m1 = 0x8BADF00D;
-      (void) m1;
       varfn(
-        (char) 0x11, (short) 0xf1f0, (char) 0x13, (char) 0x17, 0x19990119l, 0x1234567890ABCDEFll, 
-        (char) 0x19, (short) 0xf3f3, (char) 0x23, (char) 0x29, "va1",       0xDEADBEEFDEADBEEFll
+        (char) 0x11, (short) 0xf1f0, (char) 0x13, (char) 0x17, 0x19990119l, 0x1234567890ABCDEFll
       );
     }
   `,
     {
-      on_vararg(ptrVarargStart: number) {
-        console.log("*...", ptrVarargStart);
-        // prettier-ignore
-        const expectedMemory = [
-          // va1 (signed char promoted to int).
-          0x19, 0x00, 0x00, 0x00,
-          // va2 (signed short promoted to int).
-          0xF3, 0xF3, 0xFF, 0xFF,
-          // va3 (signed char promoted to int).
-          0x23, 0x00, 0x00, 0x00,
-          // va4 (signed char promoted to int).
-          0x29, 0x00, 0x00, 0x00,
-          // va5 (char const* to static).
-          0x00, 0x04, 0x00, 0x00,
-          // Alignment padding.
-          0x00, 0x00, 0x00, 0x00,
-          // va6.
-          0xEF, 0xBE, 0xAD, 0xDE, 0xEF, 0xBE, 0xAD, 0xDE
-        ];
-        const actualMemory = [
-          ...new Uint8Array(
-            memory.buffer,
-            ptrVarargStart,
-            expectedMemory.length
-          ),
-        ].map(byteHex);
-        expect(actualMemory).toEqual(expectedMemory.map(byteHex));
-      },
       on_frame(ptrStackVar1: number) {
         console.log("*ptrStackVar1", ptrStackVar1);
         // prettier-ignore
-        const expectedMemory = [
+        const expectedArgsMemory = [
           // stackVar1.
           0xBA, 0xB0, 0xFE, 0xCA,
           // a6.
@@ -155,12 +128,79 @@ test("WASM args and varargs layout", async () => {
           // Alignment padding.
           0x00,
           // a1.
-          0x11
+          0x11,
         ];
-        const actualMemory = [
-          ...new Uint8Array(memory.buffer, ptrStackVar1, expectedMemory.length),
+        const actualArgsMemory = [
+          ...new Uint8Array(
+            memory.buffer,
+            ptrStackVar1,
+            expectedArgsMemory.length
+          ),
         ].map(byteHex);
-        expect(actualMemory).toEqual(expectedMemory.map(byteHex));
+        expect(actualArgsMemory).toEqual(expectedArgsMemory.map(byteHex));
+      },
+    },
+    2
+  );
+  exports.main();
+});
+
+test("WASM varargs layout", async () => {
+  /*
+     SUMMARY:
+     Variadic arguments are promoted to long, aligned with padding, and pushed downwards from first to last.
+     Definition of push: set value to next address **in push direction** where address is multiple of value size.
+       - Order of values pushed and the push direction are significant, as they determine which bytes are skipped as padding.
+     NOTE: This is describing imported/external functions.
+   */
+  const { exports, memory } = await compile<{
+    main(): number;
+  }>(
+    `
+    void varfn(char a1, short a2, char a3, char a4, long a5, long long a6, ...);
+    __attribute__((visibility("default"))) int main(void) {
+      varfn(
+        (char) 0x11, (short) 0xf1f0, (char) 0x13, (char) 0x17, 0x19990119l, 0x1234567890ABCDEFll,
+        (char) 0x19, (short) 0xf3f3, (char) 0x23, (char) 0x29, "va1",       0xDEADBEEFDEADBEEFll
+      );
+    }
+  `,
+    {
+      varfn(
+        _a1: number,
+        _a2: number,
+        _a3: number,
+        _a4: number,
+        _a5: number,
+        _a6: number,
+        ptrVarargBuf: number
+      ) {
+        console.log("*...", ptrVarargBuf);
+        // prettier-ignore
+        const expectedVarargMemory = [
+          // va1 (signed char promoted to int).
+          0x19, 0x00, 0x00, 0x00,
+          // va2 (signed short promoted to int).
+          0xF3, 0xF3, 0xFF, 0xFF,
+          // va3 (signed char promoted to int).
+          0x23, 0x00, 0x00, 0x00,
+          // va4 (signed char promoted to int).
+          0x29, 0x00, 0x00, 0x00,
+          // va5 (char const* to static).
+          0x00, 0x04, 0x00, 0x00,
+          // Alignment padding.
+          0x00, 0x00, 0x00, 0x00,
+          // va6.
+          0xEF, 0xBE, 0xAD, 0xDE, 0xEF, 0xBE, 0xAD, 0xDE,
+        ];
+        const actualVarargMemory = [
+          ...new Uint8Array(
+            memory.buffer,
+            ptrVarargBuf,
+            expectedVarargMemory.length
+          ),
+        ].map(byteHex);
+        expect(actualVarargMemory).toEqual(expectedVarargMemory.map(byteHex));
       },
     },
     2
