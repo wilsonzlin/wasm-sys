@@ -4,6 +4,7 @@
     "allowJs": false,
     "allowSyntheticDefaultImports": true,
     "alwaysStrict": true,
+    "declaration": true,
     "esModuleInterop": true,
     "isolatedModules": true,
     "lib": [
